@@ -1,0 +1,13 @@
+{
+  "name": "onair-local",
+  "description": "Local development marketplace for onair status light plugin",
+  "owner": {
+    "name": "local-development"
+  },
+  "plugins": [
+    {
+      "name": "onair",
+      "source": "."
+    }
+  ]
+}
