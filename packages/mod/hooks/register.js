@@ -11,7 +11,7 @@ const sessionKey = { plugin: 'onair', key: 'session' };
 const flushKey = { plugin: 'onair', key: 'lastFlush' };
 let eventSeq = 0;
 export async function register(on, options) {
-    // Session start: initialize state, start daemon if needed, register command
+    // Session start: initialize state, check daemon, register command
     on('session.start', async ($, e, next) => {
         const result = await next(e);
         const sessionId = String(await $.session.id());
@@ -32,21 +32,17 @@ export async function register(on, options) {
             name: 'onair',
             description: 'onair status and controls',
         });
-        // Check if daemon is running; if not, start it
+        // Check if daemon is running; if not, log instruction
         try {
             const token = await readToken($, tokenPath);
             await $.http.fetch(`${DAEMON_URL}/healthz`, {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
         }
-        catch {
-            // Daemon not running; start it (daemonize and exit)
-            try {
-                await $.process.run(['onaird', 'up']);
-            }
-            catch (startErr) {
-                // Ignore; daemon might already be starting or user needs to install it
-            }
+        catch (err) {
+            // Daemon not running - log clear instruction for user
+            $.ui.log('[claude-onair] Daemon not running. Start it with: onaird up');
+            $.ui.log('[claude-onair] (The daemon must be running for the status light to work)');
         }
         await queueEvent($, {
             t: 'session.start',
