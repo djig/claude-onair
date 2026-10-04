@@ -1,0 +1,12 @@
+{
+  "name": "claude-onair-local",
+  "owner": {
+    "name": "local-development"
+  },
+  "plugins": [
+    {
+      "name": "claude-onair",
+      "source": "."
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@claude-onair/mod",
+  "version": "0.1.0",
+  "description": "Claude Code mod that streams session state to the onair daemon",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "claude plugin test .",
+    "validate": "claude plugin validate .",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist *.tsbuildinfo .claude-plugin/types"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
