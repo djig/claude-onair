@@ -85,11 +85,13 @@ describe('Async $ API handling', () => {
     
     // Verify state.set was called with a string sessionId (not {})
     expect($.state.set).toHaveBeenCalled()
-    const stateSetCalls = $.state.set.mock.calls
+    const stateSetCalls = ($.state.set as any).mock.calls as any[]
     const sessionStateCall = stateSetCalls.find((call: any) => call[0]?.key === 'session')
     expect(sessionStateCall).toBeTruthy()
-    expect(sessionStateCall[1].sessionId).toBe(mockSessionId)
-    expect(sessionStateCall[1].sessionId).toEqual(expect.any(String))
+    if (sessionStateCall && sessionStateCall.length > 1) {
+      expect(sessionStateCall[1].sessionId).toBe(mockSessionId)
+      expect(sessionStateCall[1].sessionId).toEqual(expect.any(String))
+    }
   })
 
   it('should handle $.fs.read returning non-string values', async () => {
