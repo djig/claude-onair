@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "pnpm -r typecheck",
     "clean": "pnpm -r clean && rm -rf node_modules",
     "dev:daemon": "pnpm --filter @claude-onair/daemon dev",
@@ -25,5 +26,10 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "packageManager": "pnpm@9.0.0"
+  "packageManager": "pnpm@9.0.0",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@vitest/ui": "^5.0.3",
+    "vitest": "^5.0.3"
+  }
 }

@@ -38,4 +38,4 @@ jobs:
         run: pnpm build
       
       - name: Run tests
-        run: pnpm test || echo "Tests not fully implemented yet"
+        run: pnpm test

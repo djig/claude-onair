@@ -2,8 +2,12 @@
 
 ## Verification Methodology
 
-The following API assumptions were verified against the official Claude Code mods documentation:
+The following API assumptions were verified against:
+1. Official Claude Code mods documentation (v2.1.289)
+2. `claude plugin validate` output (run on actual code)
+3. TypeScript types from `@anthropic-ai/claude-code@2.1.289`
 
+- ✅ **Verified by validate**: Confirmed by running `claude plugin validate`
 - ✅ **Verified by docs**: Explicitly documented in the official reference
 - 🟡 **Inferred from docs**: Strongly implied but not directly shown in examples
 - ❓ **Unverified**: Requires testing with live Claude Code session or real hardware
@@ -185,11 +189,40 @@ claude plugin test .
 
 This would verify event handling, state transitions, and command responses in isolation.
 
-## Build Verification
+## Build & Validation Results
+
+### ✅ Verified by `claude plugin validate`
+
+Ran: `npx @anthropic-ai/claude-code@2.1.289 plugin validate ./packages/mod`
+
+Output:
+```
+✔ Validation passed
+
+  ❯ types ./types/index.d.ts declares on $: nothing (no EngineInterface member)
+  ❯ types ./types/index.d.ts declares state: onair.session, onair.lastFlush
+
+  ❯ ./register.js hooks: session.start, session.end, prompt.submit, turn.start, 
+    turn.step, tool.call, tool.check, turn.complete, classic.StopFailure, 
+    session.measure, agent.spawn, command.run{command=onair}
+    
+  ❯ ./register.js calls: $.clock.every, $.command.register, $.env.get, $.fs.read, 
+    $.http.fetch, $.process.run, $.session.id, $.session.usage, $.state.get, 
+    $.state.set, $.ui.log (via flushEvents)
+    
+  ❯ ./register.js env writes: nothing
+  ❯ ./register.js env reads: HOME, USERPROFILE
+  ❯ ./register.js state writes: onair.lastFlush, onair.session
+  ❯ ./register.js state reads: onair.lastFlush, onair.session
+```
+
+### Build Verification
 
 - ✅ `pnpm install` succeeds
 - ✅ `pnpm typecheck` passes (no TypeScript errors)
 - ✅ `pnpm build` produces `dist/` output for all packages
+- ✅ `pnpm test` passes (19/19 tests)
+- ✅ `claude plugin validate` passes
 - ✅ Daemon CLI (`onaird`) is executable via `node packages/daemon/dist/cli.js`
 - ✅ Mod hooks module compiles to `packages/mod/hooks/register.js`
 - ✅ CI workflow defined for Node 20 and 22

@@ -4,20 +4,20 @@
  * Hooks Claude Code session events and streams them to the local onaird daemon.
  */
 
-import type { SessionState, FlushState } from '../types/index.js'
+import type { SessionState, FlushState } from '../.claude-plugin/types/index.js'
 
 const DAEMON_URL = 'http://127.0.0.1:47800'
 const FLUSH_INTERVAL_MS = 100
 const MAX_BATCH_SIZE = 50
 
 // Module state (survives hot reload via $.state)
-const sessionKey = { plugin: 'claude-onair', key: 'session' }
-const flushKey = { plugin: 'claude-onair', key: 'lastFlush' }
+const sessionKey = { plugin: 'onair', key: 'session' }
+const flushKey = { plugin: 'onair', key: 'lastFlush' }
 
 let eventSeq = 0
 
 export async function register(on: any, options: any) {
-  // Session start: initialize state and start daemon if needed
+  // Session start: initialize state, start daemon if needed, register command
   on('session.start', async ($: any, e: any, next: any) => {
     const result = await next(e)
     
@@ -36,6 +36,12 @@ export async function register(on: any, options: any) {
       lastFlushAt: 0,
       pendingEvents: [],
     } as FlushState)
+
+    // Register /onair command
+    await $.command.register({
+      name: 'onair',
+      description: 'onair status and controls',
+    })
 
     // Check if daemon is running; if not, start it
     try {
@@ -209,15 +215,15 @@ export async function register(on: any, options: any) {
     return next(e)
   })
 
-  // Register /onair command
+  // Handle /onair command
   on('command.run', { command: 'onair' }, async ($: any, e: any) => {
     const subcommand = e.args?.[0] || 'status'
 
     if (subcommand === 'status') {
       const session = await $.state.get(sessionKey)
       const text = session.value
-        ? `claude-onair: ${session.value.currentState}`
-        : 'claude-onair: not initialized'
+        ? `onair: ${session.value.currentState}`
+        : 'onair: not initialized'
       return { text }
     }
 
@@ -226,15 +232,6 @@ export async function register(on: any, options: any) {
     }
 
     return { text: 'Usage: /onair [status | test colors]' }
-  })
-
-  on('session.start', async ($: any, e: any, next: any) => {
-    const result = await next(e)
-    await $.command.register({
-      name: 'onair',
-      description: 'claude-onair status and controls',
-    })
-    return result
   })
 }
 
