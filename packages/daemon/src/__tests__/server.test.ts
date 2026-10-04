@@ -95,15 +95,39 @@ describe('DaemonServer', () => {
     expect(response.status).toBe(401)
   })
 
-  it('should bind only to loopback (127.0.0.1)', async () => {
-    // This test verifies the server binds to 127.0.0.1
-    // We can't directly test Host header rejection with fetch
-    // as fetch sets Host automatically
-    const response = await fetch(`http://127.0.0.1:${testPort}/healthz`)
-    expect(response.ok).toBe(true)
+  it('should reject requests with invalid Host header', async () => {
+    const http = await import('node:http')
     
-    // The host validation is tested by the fact that
-    // we're connecting to 127.0.0.1 which is in allowedHosts
+    // Use raw HTTP request to set custom Host header
+    const result = await new Promise<{ statusCode: number; body: string }>((resolve) => {
+      const req = http.request({
+        hostname: '127.0.0.1',
+        port: testPort,
+        path: '/healthz',
+        method: 'GET',
+        headers: {
+          'Host': 'evil.com:1234',
+        },
+      }, (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', chunk => chunks.push(chunk))
+        res.on('end', () => {
+          resolve({
+            statusCode: res.statusCode || 0,
+            body: Buffer.concat(chunks).toString(),
+          })
+        })
+      })
+      
+      req.on('error', (err) => {
+        throw err
+      })
+      
+      req.end()
+    })
+    
+    expect(result.statusCode).toBe(400)
+    expect(result.body).toContain('invalid Host header')
   })
 
   it('should accept localhost as valid Host header', async () => {
