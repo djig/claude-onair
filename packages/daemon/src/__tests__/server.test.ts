@@ -64,7 +64,7 @@ describe('DaemonServer', () => {
     })
 
     expect(response.ok).toBe(true)
-    const data = await response.json()
+    const data = await response.json() as { ok: boolean }
     expect(data.ok).toBe(true)
   })
 
@@ -171,7 +171,7 @@ describe('DaemonServer', () => {
     })
 
     expect(response.ok).toBe(true)
-    const data = await response.json()
+    const data = await response.json() as { processed: number }
     expect(data.processed).toBe(2)
 
     // Verify state was updated
@@ -182,7 +182,7 @@ describe('DaemonServer', () => {
       },
     })
 
-    const status = await statusResponse.json()
+    const status = await statusResponse.json() as { aggregate: { state: string } }
     expect(status.aggregate.state).toBe('thinking')
   })
 
