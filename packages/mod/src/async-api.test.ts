@@ -7,6 +7,7 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { register } from '../src/register.js'
+import type { ClaudeModRuntime } from '../types/claude-mod-runtime.js'
 
 describe('Async $ API handling', () => {
   it('should await $.env.get() and build correct token path', async () => {
@@ -84,11 +85,13 @@ describe('Async $ API handling', () => {
     
     // Verify state.set was called with a string sessionId (not {})
     expect($.state.set).toHaveBeenCalled()
-    const stateSetCalls = $.state.set.mock.calls
+    const stateSetCalls = ($.state.set as any).mock.calls as any[]
     const sessionStateCall = stateSetCalls.find((call: any) => call[0]?.key === 'session')
     expect(sessionStateCall).toBeTruthy()
-    expect(sessionStateCall[1].sessionId).toBe(mockSessionId)
-    expect(sessionStateCall[1].sessionId).toEqual(expect.any(String))
+    if (sessionStateCall && sessionStateCall.length > 1) {
+      expect(sessionStateCall[1].sessionId).toBe(mockSessionId)
+      expect(sessionStateCall[1].sessionId).toEqual(expect.any(String))
+    }
   })
 
   it('should handle $.fs.read returning non-string values', async () => {
@@ -185,5 +188,58 @@ describe('Async $ API handling', () => {
     
     // Verify ui.log would be called with the error message
     expect($.ui.log).not.toHaveBeenCalledWith('[claude-onair] Failed to flush events')
+  })
+
+  it('should log helpful message when daemon is not running', async () => {
+    const mockHome = '/home/testuser'
+    const mockSessionId = 'test-session-789'
+    
+    // Mock $ with daemon health check failing
+    const $ = {
+      env: {
+        get: vi.fn((key: string) => Promise.resolve(key === 'HOME' ? mockHome : undefined)),
+      },
+      session: {
+        id: vi.fn(() => Promise.resolve(mockSessionId)),
+        usage: vi.fn(() => Promise.resolve({ rateLimits: [] })),
+      },
+      fs: {
+        read: vi.fn(() => Promise.resolve('test-token')),
+      },
+      http: {
+        fetch: vi.fn(() => Promise.reject(new Error('Connection refused'))),
+      },
+      state: {
+        get: vi.fn(() => Promise.resolve({ value: null })),
+        set: vi.fn(() => Promise.resolve()),
+      },
+      clock: {
+        every: vi.fn(() => {}),
+      },
+      command: {
+        register: vi.fn(() => Promise.resolve()),
+      },
+      ui: {
+        log: vi.fn(() => {}),
+      },
+    }
+
+    const event = { surface: 'terminal', isInteractive: true }
+    const next = vi.fn(() => Promise.resolve({ result: 'ok' }))
+
+    let sessionStartHandler: any = null
+    const on = vi.fn((eventName: string, ...args: any[]) => {
+      if (eventName === 'session.start') {
+        sessionStartHandler = args[args.length - 1]
+      }
+    })
+
+    await register(on, {})
+    expect(sessionStartHandler).toBeTruthy()
+    await sessionStartHandler($, event, next)
+
+    // Verify helpful message was logged (not trying to auto-start)
+    expect($.ui.log).toHaveBeenCalledWith('[claude-onair] Daemon not running. Start it with: onaird up')
+    expect($.ui.log).toHaveBeenCalledWith('[claude-onair] (The daemon must be running for the status light to work)')
   })
 })

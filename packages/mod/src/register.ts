@@ -5,6 +5,7 @@
  */
 
 import type { SessionState, FlushState } from '../.claude-plugin/types/index.js'
+import type { ClaudeModRuntime } from '../types/claude-mod-runtime.js'
 
 const DAEMON_URL = 'http://127.0.0.1:47800'
 const FLUSH_INTERVAL_MS = 100
@@ -17,8 +18,8 @@ const flushKey = { plugin: 'onair', key: 'lastFlush' }
 let eventSeq = 0
 
 export async function register(on: any, options: any) {
-  // Session start: initialize state, start daemon if needed, register command
-  on('session.start', async ($: any, e: any, next: any) => {
+  // Session start: initialize state, check daemon, register command
+  on('session.start', async ($: ClaudeModRuntime, e: any, next: any) => {
     const result = await next(e)
     
     const sessionId = String(await $.session.id())
@@ -43,19 +44,16 @@ export async function register(on: any, options: any) {
       description: 'onair status and controls',
     })
 
-    // Check if daemon is running; if not, start it
+    // Check if daemon is running; if not, log instruction
     try {
       const token = await readToken($, tokenPath)
       await $.http.fetch(`${DAEMON_URL}/healthz`, {
         headers: { 'Authorization': `Bearer ${token}` },
       })
-    } catch {
-      // Daemon not running; start it (daemonize and exit)
-      try {
-        await $.process.run(['onaird', 'up'])
-      } catch (startErr) {
-        // Ignore; daemon might already be starting or user needs to install it
-      }
+    } catch (err: any) {
+      // Daemon not running - log clear instruction for user
+      $.ui.log('[claude-onair] Daemon not running. Start it with: onaird up')
+      $.ui.log('[claude-onair] (The daemon must be running for the status light to work)')
     }
 
     await queueEvent($, {
@@ -72,7 +70,7 @@ export async function register(on: any, options: any) {
   })
 
   // Session end
-  on('session.end', async ($: any, e: any, next: any) => {
+  on('session.end', async ($: ClaudeModRuntime, e: any, next: any) => {
     await queueEvent($, {
       t: 'session.end',
       data: { reason: e.reason },
@@ -83,7 +81,7 @@ export async function register(on: any, options: any) {
   })
 
   // Prompt submitted
-  on('prompt.submit', async ($: any, e: any, next: any) => {
+  on('prompt.submit', async ($: ClaudeModRuntime, e: any, next: any) => {
     await queueEvent($, {
       t: 'prompt',
       data: { length: e.text?.length || 0 },
@@ -92,7 +90,7 @@ export async function register(on: any, options: any) {
   })
 
   // Turn start
-  on('turn.start', async ($: any, e: any, next: any) => {
+  on('turn.start', async ($: ClaudeModRuntime, e: any, next: any) => {
     await queueEvent($, {
       t: 'turn.start',
       data: { turnId: e.turnId },
@@ -101,7 +99,7 @@ export async function register(on: any, options: any) {
   })
 
   // Turn step (thinking/model request)
-  on('turn.step', async function* ($: any, e: any, next: any) {
+  on('turn.step', async function* ($: ClaudeModRuntime, e: any, next: any) {
     await queueEvent($, {
       t: 'step.start',
       data: { turnId: e.turnId, index: e.index, model: e.model },
@@ -128,7 +126,7 @@ export async function register(on: any, options: any) {
   })
 
   // Tool call
-  on('tool.call', async ($: any, e: any, next: any) => {
+  on('tool.call', async ($: ClaudeModRuntime, e: any, next: any) => {
     await queueEvent($, {
       t: 'tool.start',
       data: { tool: e.tool },
@@ -153,7 +151,7 @@ export async function register(on: any, options: any) {
   })
 
   // Permission check
-  on('tool.check', async ($: any, e: any, next: any) => {
+  on('tool.check', async ($: ClaudeModRuntime, e: any, next: any) => {
     const decision = await next(e)
 
     if (decision === 'ask') {
@@ -167,7 +165,7 @@ export async function register(on: any, options: any) {
   })
 
   // Turn complete
-  on('turn.complete', async ($: any, e: any, next: any) => {
+  on('turn.complete', async ($: ClaudeModRuntime, e: any, next: any) => {
     await queueEvent($, {
       t: 'turn.end',
       data: {
@@ -182,7 +180,7 @@ export async function register(on: any, options: any) {
   })
 
   // Error
-  on('classic.StopFailure', async ($: any, e: any, next: any) => {
+  on('classic.StopFailure', async ($: ClaudeModRuntime, e: any, next: any) => {
     await queueEvent($, {
       t: 'error',
       data: { reason: e.reason || 'unknown' },
@@ -191,7 +189,7 @@ export async function register(on: any, options: any) {
   })
 
   // Usage
-  on('session.measure', async ($: any, e: any, next: any) => {
+  on('session.measure', async ($: ClaudeModRuntime, e: any, next: any) => {
     const result = await next(e)
     
     const usage = await $.session.usage()
@@ -207,7 +205,7 @@ export async function register(on: any, options: any) {
   })
 
   // Subagent spawn
-  on('agent.spawn', async ($: any, e: any, next: any) => {
+  on('agent.spawn', async ($: ClaudeModRuntime, e: any, next: any) => {
     await queueEvent($, {
       t: 'subagent',
       data: { delta: 1, isTeammate: e.isTeammate },
@@ -216,7 +214,7 @@ export async function register(on: any, options: any) {
   })
 
   // Handle /onair command
-  on('command.run', { command: 'onair' }, async ($: any, e: any) => {
+  on('command.run', { command: 'onair' }, async ($: ClaudeModRuntime, e: any) => {
     const subcommand = e.args?.[0] || 'status'
 
     if (subcommand === 'status') {
@@ -237,7 +235,7 @@ export async function register(on: any, options: any) {
 
 // $.fs.read may return a string or a result object; throw if no usable token
 // so callers fall through to their error path instead of sending "Bearer null".
-async function readToken($: any, tokenPath: string): Promise<string> {
+async function readToken($: ClaudeModRuntime, tokenPath: string): Promise<string> {
   const raw = await $.fs.read(tokenPath)
   const text = typeof raw === 'string' ? raw : (raw as any)?.text ?? (raw as any)?.content ?? (raw as any)?.value
   if (typeof text !== 'string' || !text.trim()) {
@@ -246,7 +244,7 @@ async function readToken($: any, tokenPath: string): Promise<string> {
   return text.trim()
 }
 
-async function queueEvent($: any, partial: { t: string; data: Record<string, unknown> }, agentId?: string) {
+async function queueEvent($: ClaudeModRuntime, partial: { t: string; data: Record<string, unknown> }, agentId?: string) {
   const session = await $.state.get(sessionKey)
   if (!session.value) return
 
@@ -290,7 +288,7 @@ async function queueEvent($: any, partial: { t: string; data: Record<string, unk
   }
 }
 
-async function flushEvents($: any, force = false): Promise<void> {
+async function flushEvents($: ClaudeModRuntime, force = false): Promise<void> {
   const { value: flush } = await $.state.get(flushKey)
   if (!flush || flush.pendingEvents.length === 0) return
 

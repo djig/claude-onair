@@ -53,10 +53,20 @@ pnpm build
 # Add as a marketplace (development install)
 claude plugin marketplace add ./packages/mod
 claude plugin install onair@onair-local --scope user
-claude plugin reload
+
+# After updating the plugin locally, sync the marketplace
+claude plugin marketplace update onair-local
+# Then reload in a Claude session with: /reload-plugins
 ```
 
-The daemon (`onaird`) auto-starts when the mod loads. Check status:
+**Start the daemon**:
+
+```bash
+# The daemon must be running for the status light to work
+onaird up
+```
+
+Check status:
 
 ```bash
 # In a Claude Code session
