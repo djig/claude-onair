@@ -126,6 +126,12 @@ export class DaemonServer {
     // Process events
     for (const event of events) {
       try {
+        // Validate session field is a non-empty string
+        if (!event.session || typeof event.session !== 'string' || !event.session.trim()) {
+          console.warn('[server] Skipping event with invalid session:', event.session)
+          continue
+        }
+        
         const newState = this.reducer.reduce(event)
         await this.lampManager.setState(newState)
       } catch (err: any) {

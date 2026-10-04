@@ -67,7 +67,7 @@ export interface ThemeConfig {
 }
 
 export interface DriverConfig {
-  type: 'blink1' | 'wled' | 'home-assistant' | 'webhook'
+  type: 'blink1' | 'wled' | 'home-assistant' | 'govee' | 'webhook'
   enabled: boolean
   config: Record<string, unknown>
 }

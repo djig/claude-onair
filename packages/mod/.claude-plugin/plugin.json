@@ -1,7 +1,7 @@
 {
   "name": "onair",
   "version": "0.1.0",
-  "description": "Physical status light for Claude Code sessions. Maps session state to blink(1), WLED, Home Assistant, or any webhook-compatible device.",
+  "description": "Physical status light for Claude Code sessions. Maps session state to blink(1), WLED, Govee (LAN), Home Assistant, or any webhook-compatible device.",
   "author": {
     "name": "Jignesh Dhamecha",
     "url": "https://github.com/djig"

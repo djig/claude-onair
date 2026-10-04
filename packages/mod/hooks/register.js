@@ -14,8 +14,8 @@ export async function register(on, options) {
     // Session start: initialize state, start daemon if needed, register command
     on('session.start', async ($, e, next) => {
         const result = await next(e);
-        const sessionId = $.session.id();
-        const home = $.env.get('HOME') || $.env.get('USERPROFILE') || '/tmp';
+        const sessionId = String(await $.session.id());
+        const home = (await $.env.get('HOME')) || (await $.env.get('USERPROFILE')) || '/tmp';
         const tokenPath = `${home}/.config/claude-onair/token`;
         await $.state.set(sessionKey, {
             sessionId,
@@ -34,9 +34,9 @@ export async function register(on, options) {
         });
         // Check if daemon is running; if not, start it
         try {
-            const token = await $.fs.read(tokenPath);
+            const token = await readToken($, tokenPath);
             await $.http.fetch(`${DAEMON_URL}/healthz`, {
-                headers: { 'Authorization': `Bearer ${token.trim()}` },
+                headers: { 'Authorization': `Bearer ${token}` },
             });
         }
         catch {
@@ -195,6 +195,16 @@ export async function register(on, options) {
         return { text: 'Usage: /onair [status | test colors]' };
     });
 }
+// $.fs.read may return a string or a result object; throw if no usable token
+// so callers fall through to their error path instead of sending "Bearer null".
+async function readToken($, tokenPath) {
+    const raw = await $.fs.read(tokenPath);
+    const text = typeof raw === 'string' ? raw : raw?.text ?? raw?.content ?? raw?.value;
+    if (typeof text !== 'string' || !text.trim()) {
+        throw new Error(`no token at ${tokenPath}`);
+    }
+    return text.trim();
+}
 async function queueEvent($, partial, agentId) {
     const session = await $.state.get(sessionKey);
     if (!session.value)
@@ -246,16 +256,16 @@ async function flushEvents($, force = false) {
     flush.lastFlushAt = now;
     await $.state.set(flushKey, flush);
     try {
-        const home = $.env.get('HOME') || $.env.get('USERPROFILE') || '/tmp';
+        const home = (await $.env.get('HOME')) || (await $.env.get('USERPROFILE')) || '/tmp';
         const tokenPath = `${home}/.config/claude-onair/token`;
-        const token = await $.fs.read(tokenPath);
+        const token = await readToken($, tokenPath);
         // Fire and forget (don't await so we don't exceed hook budget)
         // In a real production version, we'd use $.http.fetch with a timeout
         // For now, we rely on the fact that the daemon is local and fast
         await $.http.fetch(`${DAEMON_URL}/v1/ingest`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token.trim()}`,
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(events),
@@ -263,6 +273,6 @@ async function flushEvents($, force = false) {
     }
     catch (err) {
         // Fail silently; mod should never crash the session
-        $.ui.log('[claude-onair] Failed to flush events');
+        $.ui.log('[claude-onair] Failed to flush events: ' + String((err && err.stack || err.message) || err));
     }
 }
