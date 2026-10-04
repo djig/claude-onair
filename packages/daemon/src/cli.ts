@@ -149,6 +149,9 @@ async function runDoctor() {
       case 'home-assistant':
         await checkHomeAssistant(driver.config)
         break
+      case 'govee':
+        await checkGovee(driver.config)
+        break
       case 'webhook':
         await checkWebhook(driver.config)
         break
@@ -236,6 +239,20 @@ async function checkHomeAssistant(config: Record<string, unknown>) {
   }
 }
 
+async function checkGovee(config: Record<string, unknown>) {
+  const ip = config.ip as string
+  if (!ip) {
+    console.log(`  ✗ Govee: no IP configured`)
+    console.log(`    Run: onaird config set govee.ip <device-ip>`)
+    console.log(`    Or use discovery to find devices on your network`)
+    return
+  }
+
+  console.log(`  ✓ Govee: configured for ${ip}`)
+  console.log(`    Note: Requires "LAN Control" enabled in Govee Home app`)
+  console.log(`    Note: On macOS, allow Local Network access in System Settings > Privacy & Security`)
+}
+
 async function checkWebhook(config: Record<string, unknown>) {
   const url = config.url as string
   if (!url) {
@@ -275,6 +292,8 @@ function showHelp() {
   console.log('  onaird status')
   console.log('  onaird config set driver wled')
   console.log('  onaird config set wled.ip 192.168.1.100')
+  console.log('  onaird config set driver govee')
+  console.log('  onaird config set govee.ip 192.168.1.50')
   console.log('  onaird doctor')
 }
 

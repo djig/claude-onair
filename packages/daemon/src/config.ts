@@ -108,15 +108,25 @@ export async function setConfigValue(key: string, value: unknown): Promise<void>
   
   if (parts[0] === 'driver' && parts.length === 2) {
     // Set active driver: "driver" = "wled"
+    // Disable all other drivers and enable only the selected one
     const driverType = value as string
-    config.drivers = [
-      {
-        type: driverType as any,
-        enabled: true,
-        config: {},
-      },
-    ]
-  } else if (parts.length >= 2 && ['blink1', 'wled', 'home-assistant', 'webhook', 'ha'].includes(parts[0])) {
+    
+    // Find existing driver or create new one
+    let driver = config.drivers.find(d => d.type === driverType)
+    if (!driver) {
+      driver = { type: driverType as any, enabled: true, config: {} }
+      config.drivers.push(driver)
+    } else {
+      driver.enabled = true
+    }
+    
+    // Disable all other drivers
+    config.drivers.forEach(d => {
+      if (d.type !== driverType) {
+        d.enabled = false
+      }
+    })
+  } else if (parts.length >= 2 && ['blink1', 'wled', 'home-assistant', 'govee', 'webhook', 'ha'].includes(parts[0])) {
     // Driver-specific config
     const driverType = parts[0] === 'ha' ? 'home-assistant' : parts[0]
     const configKey = parts.slice(1).join('.')

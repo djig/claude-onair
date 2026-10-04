@@ -15,12 +15,17 @@ const STATE_PRIORITY: Record<LampState, number> = {
   'off': 0,
 }
 
+const SESSION_STALE_MS = 10 * 60 * 1000 // 10 minutes
+
 export class StateReducer {
   private sessions = new Map<string, SessionState>()
   private lastAggregate: AggregateState | null = null
   private doneFadeTimers = new Map<string, NodeJS.Timeout>()
 
-  constructor(private doneFadeMinutes: number) {}
+  constructor(private doneFadeMinutes: number) {
+    // Periodically clean up stale sessions
+    setInterval(() => this.expireStaleSessions(), 60 * 1000)
+  }
 
   reduce(event: BusEvent): AggregateState {
     const session = this.getOrCreateSession(event.session)
@@ -177,5 +182,28 @@ export class StateReducer {
 
   getSessions(): SessionState[] {
     return Array.from(this.sessions.values())
+  }
+
+  /**
+   * Expire sessions that haven't received events in SESSION_STALE_MS
+   * and are stuck in a non-idle state, preventing phantom sessions from pinning the lamp
+   */
+  private expireStaleSessions(): void {
+    const now = Date.now()
+    const expired: string[] = []
+
+    for (const [sessionId, session] of this.sessions.entries()) {
+      if (session.isActive && now - session.lastEventAt > SESSION_STALE_MS) {
+        console.log(`[state-reducer] Expiring stale session: ${sessionId}`)
+        session.isActive = false
+        session.currentState = 'idle'
+        this.clearDoneFadeTimer(sessionId)
+        expired.push(sessionId)
+      }
+    }
+
+    if (expired.length > 0) {
+      this.lastAggregate = this.aggregate()
+    }
   }
 }

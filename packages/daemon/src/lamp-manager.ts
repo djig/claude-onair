@@ -7,6 +7,7 @@ import type { DaemonConfig } from './types.js'
 import { Blink1Driver } from '@claude-onair/drivers'
 import { WLEDDriver } from '@claude-onair/drivers'
 import { HomeAssistantDriver } from '@claude-onair/drivers'
+import { GoveeDriver } from '@claude-onair/drivers'
 import { WebhookDriver } from '@claude-onair/drivers'
 
 export class LampManager {
@@ -90,6 +91,12 @@ export class LampManager {
           url: config.url as string,
           token: config.token as string,
           entity: config.entity as string,
+          theme: themeStates,
+        })
+
+      case 'govee':
+        return new GoveeDriver({
+          ip: config.ip as string,
           theme: themeStates,
         })
 

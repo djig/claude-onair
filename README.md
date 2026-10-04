@@ -26,9 +26,10 @@ The daemon aggregates state across all your Claude Code sessions and supports mu
 |--------|-------|---------|-----|
 | **[blink(1) mk3](https://buy.thingm.com/blink1)** | $29.95 | USB HID | No network, no pairing. Two RGB LEDs (main state + subagent/quota accent). Works on macOS/Win/Linux. |
 | **WLED (ESP32)** | ~$20 | Local HTTP JSON API | DIY, bright, hackable. Store effects as presets and switch with one command. Perfect for desk "ON AIR" signs. |
+| **Govee (LAN)** | varies | UDP (no cloud) | Direct LAN control for H6xxx series. Bright, affordable LED strips. Works offline. |
 | **Home Assistant** (any light) | varies | REST API | Covers Hue, LIFX, Govee, Zigbee, Matter, and anything else HA integrates. |
 
-Native drivers for **Philips Hue**, **LIFX**, and **Govee** are planned for v1.1. **Stream Deck** (input + output) is also v1.1.
+Native drivers for **Philips Hue** and **LIFX** are planned for v1.1. **Stream Deck** (input + output) is also v1.1.
 
 ## Install
 
@@ -51,7 +52,7 @@ pnpm build
 
 # Add as a marketplace (development install)
 claude plugin marketplace add ./packages/mod
-claude plugin install claude-onair@local --scope user
+claude plugin install onair@onair-local --scope user
 claude plugin reload
 ```
 
@@ -105,6 +106,32 @@ onaird config set wled.ip 192.168.1.100
 ```
 
 Store your color patterns as **presets** in WLED's web UI. The daemon sends `{"ps": <presetNumber>}` to switch states, so you get smooth device-side animations with zero flicker.
+
+#### Govee (LAN Control)
+
+Govee H6xxx series LED strips support direct LAN control via UDP (no cloud required). Tested with H612F.
+
+1. **Enable LAN Control** in the Govee Home app:
+   - Open Govee Home app
+   - Select your device
+   - Go to Settings (gear icon)
+   - Enable "LAN Control"
+
+2. **Find your device IP**:
+   - Check your router's DHCP client list, or
+   - Use the built-in discovery (coming soon)
+
+3. **Configure**:
+
+```bash
+onaird config set driver govee
+onaird config set govee.ip 192.168.1.50
+onaird doctor
+```
+
+**macOS Note**: The first time you send UDP to a LAN device, macOS may show a "Local Network" permission prompt. Grant access in **System Settings → Privacy & Security → Local Network** and enable the checkbox for Terminal (or iTerm, etc.).
+
+**Compatible models**: H6xxx series (H6104, H6159, H6163, H6173, H618x, H619x, H612x, etc.). Check Govee's spec sheet for "LAN Control" support.
 
 #### Home Assistant
 
@@ -188,10 +215,9 @@ onaird config set active-theme my-theme
 
 ```
 /onair              # Status overview
-/onair test colors  # Cycle through all states (5s each)
-/onair theme list   # List available themes
-/onair theme set default
 ```
+
+**Note**: `/onair test colors` is not yet implemented in the mod. Use the daemon CLI for testing.
 
 ### Shell
 
@@ -201,9 +227,9 @@ onaird config list  # Show full config
 onaird config set <key> <value>
 onaird doctor       # Check setup (drivers, permissions)
 onaird up           # Start daemon (usually automatic)
-onaird stop         # Stop daemon
-onaird logs         # Tail daemon logs
 ```
+
+**Note**: `onaird test`, `onaird stop`, and `onaird logs` are not yet implemented. To stop the daemon, use `pkill onaird` or send SIGTERM to the process.
 
 ## Security Model
 
@@ -390,6 +416,12 @@ Run `onaird doctor` to check driver connectivity and permissions before testing.
 - Ping the IP: `ping 192.168.1.100`
 - Open WLED's web UI in a browser: `http://192.168.1.100`
 - Check the JSON API manually: `curl http://192.168.1.100/json/state`
+
+**Govee specific:**
+- Ensure "LAN Control" is enabled in the Govee Home app (device Settings)
+- **macOS**: Grant Local Network permission: System Settings → Privacy & Security → Local Network → enable Terminal (or your terminal app). This is required for Node to send UDP packets to LAN devices.
+- Verify the IP: `ping 192.168.1.50`
+- Check for EHOSTUNREACH errors in daemon logs (indicates missing Local Network permission)
 
 **Home Assistant specific:**
 - Test the token: `curl -H "Authorization: Bearer YOUR_TOKEN" http://homeassistant.local:8123/api/`
