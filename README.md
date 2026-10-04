@@ -227,7 +227,7 @@ onaird config set active-theme my-theme
 /onair              # Status overview
 ```
 
-**Note**: `/onair test colors` is not yet implemented in the mod. Use the daemon CLI for testing.
+**Note**: `/onair test colors` and `onaird test` are not yet implemented. Use a live Claude Code session to test hardware (see [Testing with Real Hardware](#testing-with-real-hardware)).
 
 ### Shell
 
@@ -359,12 +359,12 @@ Tests stub `$.http.fetch` and verify:
 
 We cannot run live, authenticated Claude Code sessions or control real USB/network devices in this environment. Manual testing steps:
 
-1. **blink(1)**: Plug in the device, run `/onair test colors` in a Claude Code session, and verify the LED cycles through states.
-2. **WLED**: Set up an ESP32 with WLED, configure `wled.ip`, run the test, and watch your strip change colors.
-3. **Home Assistant**: Configure a light entity, run the test, and confirm the light follows the states.
+1. **blink(1)**: Plug in the device and enable its driver in the daemon configuration.
+2. **WLED**: Set up an ESP32 with WLED and configure and enable its driver with the device IP.
+3. **Home Assistant**: Configure and enable its driver with the URL, token, and light entity.
 4. **Live session**: Start a coding task in Claude Code and watch the lamp reflect thinking → tool → needs-you → done.
 
-Run `onaird doctor` to check driver connectivity and permissions before testing.
+Run `onaird doctor` to check driver connectivity and permissions before testing. Use the live-session step above to test your configured hardware; `/onair test colors` and `onaird test` are not implemented yet.
 
 ## Roadmap
 
@@ -415,8 +415,8 @@ Run `onaird doctor` to check driver connectivity and permissions before testing.
 
 1. Check daemon status: `onaird status` (should show "running")
 2. Run diagnostics: `onaird doctor`
-3. Test the driver directly: `onaird test` (bypasses the event bus, sends test states to hardware)
-4. Check logs: `onaird logs` (look for connection errors)
+3. Start a coding task in Claude Code and check whether the lamp follows the session states (see [Testing with Real Hardware](#testing-with-real-hardware)).
+4. Check the daemon's terminal output for driver connection errors. If the daemon is not running, start it in a terminal with `onaird up` to see its output; `onaird logs` is not implemented yet.
 
 **blink(1) specific:**
 - Linux: confirm the udev rule is active (`ls -l /dev/hidraw*` should show mode 0666)
