@@ -1,22 +1,30 @@
+<div align="center">
+
 # claude-onair
 
-**Physical status light for Claude Code sessions.** Turn a USB light, smart bulb, or LED strip into a live indicator of what Claude is doing.
+**A desk light that tells you what Claude Code is doing, and blinks amber the moment it needs you.**
 
-> **v1 Milestone:** Lamp only. The Broadcast feature (streaming AG-UI to a web viewer) comes in a later release.
+[![CI](https://github.com/djig/claude-onair/actions/workflows/ci.yml/badge.svg)](https://github.com/djig/claude-onair/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-![Demo](./assets/demo.gif)
+</div>
 
-## What It Is
+You kick off a long Claude Code task, switch to Slack, and come back 20 minutes later to find it has been waiting on a permission prompt the whole time. **claude-onair** fixes that with a light you can see from across the room:
 
-`claude-onair` is a Claude Code mod (plugin) plus a local helper daemon (`onaird`). It maps your session state to hardware:
+| Light | Meaning |
+|---|---|
+| 🔵 slow blue breathe | Claude is thinking |
+| 🩵 cyan | running a tool |
+| 🟠 **fast amber blink** | **needs you** (permission, question, or input) |
+| 🟢 green, then fades | done |
+| 🔴 red | error |
 
-- **Thinking**: slow blue breathe on your blink(1) or WLED strip
-- **Running a tool**: cyan
-- **Needs you** (waiting on permission, question, or input): **amber fast blink**
-- **Done**: green for 3 minutes, then fade
-- **Error**: red solid
+- **Exact state, not guesses.** Built as a Claude Code [mod](https://code.claude.com/docs/en/plugins/mods), so it sees `tool.check → ask` and every turn step inside Claude Code, with no polling or transcript scraping.
+- **All your sessions, one light.** A small local daemon merges every Claude Code session into one state (needs-you always wins).
+- **Bring your own light.** blink(1) (USB), WLED (ESP32), Govee (LAN, no cloud), anything in Home Assistant (Hue, LIFX, Zigbee, Matter), or any webhook. Run several at once.
+- **Local only.** Binds to 127.0.0.1 with a per-user token. No cloud, no account.
 
-The daemon aggregates state across all your Claude Code sessions and supports multiple light drivers simultaneously.
+> **No light?** Use the webhook driver to send state changes to ntfy, Slack, or any service that accepts a POST.
 
 ## Hardware
 
@@ -28,8 +36,7 @@ The daemon aggregates state across all your Claude Code sessions and supports mu
 | **WLED (ESP32)** | ~$20 | Local HTTP JSON API | DIY, bright, hackable. Store effects as presets and switch with one command. Perfect for desk "ON AIR" signs. |
 | **Govee (LAN)** | varies | UDP (no cloud) | Direct LAN control for H6xxx series. Bright, affordable LED strips. Works offline. |
 | **Home Assistant** (any light) | varies | REST API | Covers Hue, LIFX, Govee, Zigbee, Matter, and anything else HA integrates. |
-
-Native drivers for **Philips Hue** and **LIFX** are planned for v1.1. **Stream Deck** (input + output) is also v1.1.
+| **Webhook** | free | HTTP POST | Send state to ntfy, Slack, Home Assistant, or any webhook endpoint. No hardware needed. |
 
 ## Install
 
@@ -39,41 +46,45 @@ Native drivers for **Philips Hue** and **LIFX** are planned for v1.1. **Stream D
 - **Node.js 20+** or **Bun**
 - **pnpm** (`npm install -g pnpm`)
 
-### Install the mod
+### Quick start
 
 ```bash
-# Clone this repo
+# 1. Clone and build
 git clone https://github.com/djig/claude-onair.git
 cd claude-onair
-
-# Install dependencies and build
 pnpm install
 pnpm build
 
-# Add as a marketplace (development install)
-claude plugin marketplace add ./packages/mod
-claude plugin install onair@onair-local --scope user
+# 2. Install the mod (inside Claude Code)
+/plugin marketplace add djig/claude-onair
+/plugin install onair@claude-onair
 
-# After updating the plugin locally, sync the marketplace
-claude plugin marketplace update onair-local
-# Then reload in a Claude session with: /reload-plugins
-```
+# 3. Make onaird available globally
+cd packages/daemon
+pnpm link --global
 
-**Start the daemon**:
-
-```bash
-# The daemon must be running for the status light to work
+# 4. Start the daemon
 onaird up
+
+# 5. Configure your driver
+onaird config set driver blink1  # or wled | govee | home-assistant | webhook
+onaird doctor
 ```
 
-Check status:
+After installing, start a Claude Code session and run:
+
+```
+/onair status
+```
+
+### Update the mod after changes
+
+If you pull updates or edit the mod locally:
 
 ```bash
-# In a Claude Code session
-/onair status
-
-# Or via the CLI
-onaird status
+pnpm build
+# In a Claude Code session:
+/reload-plugins
 ```
 
 ### Setup your hardware
@@ -156,6 +167,33 @@ onaird config set ha.token YOUR_TOKEN_HERE
 onaird config set ha.entity light.office_lamp
 ```
 
+#### Webhook
+
+Send state changes to any HTTP endpoint. Perfect for ntfy, Slack webhooks, or custom integrations:
+
+```bash
+onaird config set driver webhook
+onaird config set webhook.url https://ntfy.sh/your-topic
+# Optional: add custom headers
+onaird config set webhook.headers.Authorization "Bearer YOUR_TOKEN"
+```
+
+The webhook driver POSTs JSON on every state change:
+
+```json
+{
+  "state": "needs-you",
+  "theme": {
+    "color": "#ff8800",
+    "pattern": "blink",
+    "speed": "fast"
+  },
+  "subagentCount": 0,
+  "quotaWarning": false,
+  "timestamp": 1728579123456
+}
+```
+
 ## Configuration
 
 Config lives at `~/.config/claude-onair/config.json`. Edit via CLI:
@@ -227,8 +265,6 @@ onaird config set active-theme my-theme
 /onair              # Status overview
 ```
 
-**Note**: `/onair test colors` and `onaird test` are not yet implemented. Use a live Claude Code session to test hardware (see [Testing with Real Hardware](#testing-with-real-hardware)).
-
 ### Shell
 
 ```bash
@@ -239,7 +275,7 @@ onaird doctor       # Check setup (drivers, permissions)
 onaird up           # Start daemon (usually automatic)
 ```
 
-**Note**: `onaird test`, `onaird stop`, and `onaird logs` are not yet implemented. To stop the daemon, use `pkill onaird` or send SIGTERM to the process.
+**Note**: `onaird stop` and `onaird logs` are not yet implemented. To stop the daemon, use `pkill onaird` or send SIGTERM to the process.
 
 ## Security Model
 
@@ -353,25 +389,27 @@ Tests stub `$.http.fetch` and verify:
 - Event batching and flush timing
 - State transitions (idle → thinking → tool → done)
 - Auto-start of the daemon via `$.process.run`
-- Command handling (`/onair status`, `/onair test colors`)
+- Command handling (`/onair status`)
 
 ## Testing with Real Hardware
 
-We cannot run live, authenticated Claude Code sessions or control real USB/network devices in this environment. Manual testing steps:
+To test with physical hardware:
 
-1. **blink(1)**: Plug in the device and enable its driver in the daemon configuration.
-2. **WLED**: Set up an ESP32 with WLED and configure and enable its driver with the device IP.
-3. **Home Assistant**: Configure and enable its driver with the URL, token, and light entity.
-4. **Live session**: Start a coding task in Claude Code and watch the lamp reflect thinking → tool → needs-you → done.
+1. **blink(1)**: Plug in the device, enable its driver in the daemon configuration, and verify with `onaird doctor`.
+2. **WLED**: Set up an ESP32 with WLED, configure the driver with the device IP, and verify connectivity.
+3. **Govee**: Enable LAN Control in the Govee Home app, configure the driver with the device IP, and test.
+4. **Home Assistant**: Configure the driver with the URL, token, and light entity.
+5. **Webhook**: Point the webhook driver at an ntfy topic, Slack webhook, or any POST endpoint.
+6. **Live session**: Start a coding task in Claude Code and watch the lamp reflect thinking → tool → needs-you → done.
 
-Run `onaird doctor` to check driver connectivity and permissions before testing. Use the live-session step above to test your configured hardware; `/onair test colors` and `onaird test` are not implemented yet.
+Run `onaird doctor` to check driver connectivity and permissions before testing.
 
 ## Roadmap
 
 ### v1.1
 
 - **Stream Deck** plugin (output tiles per session + input keys: Approve / Deny / Answer)
-- Native **Philips Hue**, **LIFX**, and **Govee** drivers
+- Native **Philips Hue** and **LIFX** drivers
 - MQTT publish (`claude/onair/state`) for Home Assistant, Node-RED, ESPHome
 
 ### v2.0: Broadcast
@@ -415,8 +453,8 @@ Run `onaird doctor` to check driver connectivity and permissions before testing.
 
 1. Check daemon status: `onaird status` (should show "running")
 2. Run diagnostics: `onaird doctor`
-3. Start a coding task in Claude Code and check whether the lamp follows the session states (see [Testing with Real Hardware](#testing-with-real-hardware)).
-4. Check the daemon's terminal output for driver connection errors. If the daemon is not running, start it in a terminal with `onaird up` to see its output; `onaird logs` is not implemented yet.
+3. Start a coding task in Claude Code and check whether the lamp follows the session states.
+4. Check the daemon's terminal output for driver connection errors. If the daemon is not running, start it in a terminal with `onaird up` to see its output.
 
 **blink(1) specific:**
 - Linux: confirm the udev rule is active (`ls -l /dev/hidraw*` should show mode 0666)
@@ -437,12 +475,29 @@ Run `onaird doctor` to check driver connectivity and permissions before testing.
 - Test the token: `curl -H "Authorization: Bearer YOUR_TOKEN" http://homeassistant.local:8123/api/`
 - Check the entity ID in HA Developer Tools → States
 
+**Webhook specific:**
+- Test the endpoint manually: `curl -X POST -H "Content-Type: application/json" -d '{"state":"test"}' YOUR_WEBHOOK_URL`
+- Check for CORS or authentication errors in daemon logs
+
 ### Daemon won't start
 
 1. Check if it's already running: `ps aux | grep onaird`
 2. Check port availability: `lsof -i :47800` (should be free or owned by `onaird`)
 3. Try manual start: `onaird up --verbose`
 4. Check for permission issues: `ls -la ~/.config/claude-onair/` (token file should be mode 0600)
+
+### onaird command not found
+
+If `onaird` is not found after installing:
+
+```bash
+# Link the daemon globally
+cd packages/daemon
+pnpm link --global
+
+# Or use npx
+npx @claude-onair/daemon up
+```
 
 ### Lamp flickers or changes too fast
 
@@ -474,7 +529,6 @@ MIT © 2026 Jignesh Dhamecha
 
 ## Acknowledgments
 
-- Design inspired by the [lamp-broadcast-deep-dive](./docs/lamp-broadcast-deep-dive.md) doc
 - Built on [Claude Code mods](https://code.claude.com/docs/en/plugins/mods) (v2.1.287+)
 - blink(1) by ThingM
 - WLED by Aircoookie
@@ -482,6 +536,8 @@ MIT © 2026 Jignesh Dhamecha
 
 ---
 
+More Claude Code tools by [@djig](https://github.com/djig): [ui-loop](https://github.com/djig/ui-loop) (token-budgeted visual feedback MCP) · [drift-guard](https://github.com/djig/drift-guard) (blocks stale React/Next/Tailwind patterns) · [route-impact](https://github.com/djig/route-impact) (which Next.js routes a diff affects)
+
 **Status**: v1 Lamp milestone. Broadcast feature (v2) coming soon.
 
-**Feedback**: Open an issue or find me on X [@djig](https://x.com/djig)
+**Feedback**: Open an issue
