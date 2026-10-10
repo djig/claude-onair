@@ -1,0 +1,14 @@
+{
+  "name": "claude-onair",
+  "description": "A desk light that shows what Claude Code is doing: amber when it needs you",
+  "owner": {
+    "name": "djig",
+    "url": "https://github.com/djig"
+  },
+  "plugins": [
+    {
+      "name": "onair",
+      "source": "./packages/mod"
+    }
+  ]
+}

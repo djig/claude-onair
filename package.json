@@ -15,10 +15,14 @@
   },
   "keywords": [
     "claude-code",
+    "claude-code-mod",
+    "claude-code-plugin",
     "claude-mods",
     "status-light",
     "blink1",
     "wled",
+    "govee",
+    "home-assistant",
     "hardware"
   ],
   "author": "Jignesh Dhamecha",
